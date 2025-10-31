@@ -109,12 +109,27 @@ public class Dir {
         }
 
         character.drawCurrentMovement(g);
+        
+        // 防止角色重叠
+        if (otherCharacter != null) {
+            Character.preventOverlap(character, otherCharacter);
+        }
     }//实现上下左右行走
 
     //修正服务器控制角色的位置，缓解两个客户端同一个角色出现的位置错位情况
     public static void refineMovement(Character character, Point position) {
         character.getPosition().setLocation(position);
     }
+    
+    /**
+     * 设置另一个角色，用于防止重叠
+     * @param otherCharacter 另一个角色
+     */
+    public void setOtherCharacter(Character otherCharacter) {
+        this.otherCharacter = otherCharacter;
+    }
+    
+    private Character otherCharacter; // 另一个角色，用于防止重叠
 
     //触发角色被击倒画面
     public void fighterFall() {

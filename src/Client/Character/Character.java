@@ -21,6 +21,10 @@ public class Character {
 
     private Dir dir;//动作按钮类
     
+    private Hitbox hitbox; // 碰撞箱
+    private AttackBox leftAttackBox; // 向左攻击箱
+    private AttackBox rightAttackBox; // 向右攻击箱
+    
     private long lastAttackTime = 0;//上次攻击时间
     private static final long ATTACK_COOLDOWN = 500;//攻击冷却时间（毫秒）
 
@@ -41,6 +45,14 @@ public class Character {
         dir = new Dir(leftOrRight);//监控动作
         dir.setCurrentDir(leftOrRight);
         dir.createMap(movements);//创建对应动作maps
+        
+        // 初始化碰撞箱（使用边距参数）
+        // 这些值需要根据实际图片调整，暂时使用示例值
+        this.hitbox = new Hitbox(this, 10, 100, 10, 150);
+        
+        // 初始化攻击箱
+        this.leftAttackBox = new AttackBox(this, "LA");
+        this.rightAttackBox = new AttackBox(this, "RA");
 
     }//将图片载入缓存区, 并且做好索引
 
@@ -49,6 +61,14 @@ public class Character {
     protected void drawCurrentMovement(Graphics g) {
         Image currentMovement = dir.getCurrentMovement();
         dir.locateDirection();//更新目前的动作
+        
+        // 更新碰撞箱位置
+        hitbox.updatePosition();
+        
+        // 更新攻击箱位置
+        leftAttackBox.updatePosition();
+        rightAttackBox.updatePosition();
+        
         g.drawImage(currentMovement,
                 (int)position.getX(),
                 (int)position.getY(),
@@ -59,36 +79,91 @@ public class Character {
 
     /**
      * 当fighter1成功攻击fighter2时，返回true，否则返回false
-     * @param fighter1
-     * @param fighter2
-     * @return
+     * @param fighter1 攻击者
+     * @param fighter2 被攻击者
+     * @return 是否攻击成功
      */
     public static boolean isAttacked(Character fighter1,Character fighter2) {
-        Point p1 = fighter1.getPosition();
-        Point p2 = fighter2.getPosition();
-
-        //攻击有效范围 - 修复攻击检测逻辑
-        if(!fighter2.getDir().FALL) {
-            // 检查水平方向重叠 - 修复逻辑错误
-            int horizontalDistance = Math.abs(p1.x - p2.x);
-            boolean horizontalOverlap = horizontalDistance <= 100; // 原来是60，现在放大3倍为180
-            
-            // 检查垂直方向重叠
-            int verticalDistance = Math.abs(p1.y - p2.y);
-            boolean verticalOverlap = verticalDistance <= 30; // 原来是30，现在放大3倍为90
-            
-            if (horizontalOverlap && verticalOverlap) {
-                System.out.println("attack! 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ")");
-                System.out.println("水平距离: " + horizontalDistance + ", 垂直距离: " + verticalDistance + " - 攻击成功！");
-                return true;
-            } else {
-                System.out.println("攻击检测: 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ")");
-                System.out.println("水平距离: " + horizontalDistance + " (需要<=100), 垂直距离: " + verticalDistance + " (需要<=30) - 攻击失败");
-            }
-        } else {
+        // 如果被攻击者处于击倒状态，则无法再次被攻击
+        if(fighter2.getDir().FALL) {
             System.out.println("攻击检测: 被攻击者处于FALL状态，无法被攻击");
+            return false;
         }
+        
+        // 根据攻击者的方向选择对应的攻击箱进行检测
+        AttackBox attackBox = null;
+        if (fighter1.getDir().getCurrentDir() == Character.RIGHT) {
+            // 使用向左攻击箱
+            attackBox = fighter1.getLeftAttackBox();
+        } else {
+            // 使用向右攻击箱
+            attackBox = fighter1.getRightAttackBox();
+        }
+        
+        // 检查攻击箱是否与被攻击者的碰撞箱相交
+        boolean isHit = attackBox.intersects(fighter2.getHitbox());
+        
+        if (isHit) {
+            Point p1 = fighter1.getPosition();
+            Point p2 = fighter2.getPosition();
+            System.out.println("attack! 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ") - 攻击成功！");
+            return true;
+        } else {
+            Point p1 = fighter1.getPosition();
+            Point p2 = fighter2.getPosition();
+            System.out.println("攻击检测: 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ") - 攻击失败");
+        }
+        
         return false;
+    }
+    
+    /**
+     * 防止两个角色重叠
+     * @param character1 角色1
+     * @param character2 角色2
+     */
+    public static void preventOverlap(Character character1, Character character2) {
+        // 检查两个角色的碰撞箱是否相交
+        if (character1.getHitbox().intersects(character2.getHitbox())) {
+            // 获取两个角色的位置
+            Point pos1 = character1.getPosition();
+            Point pos2 = character2.getPosition();
+            
+            // 计算位置差异
+            int dx = pos1.x - pos2.x;
+            int dy = pos1.y - pos2.y;
+            
+            // 确定分离方向（优先水平分离）
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // 水平分离
+                if (dx > 0) {
+                    // character1在右侧，将character1向右移动，character2向左移动
+                    pos1.x += 5;
+                    pos2.x -= 5;
+                } else {
+                    // character1在左侧，将character1向左移动，character2向右移动
+                    pos1.x -= 5;
+                    pos2.x += 5;
+                }
+            } else {
+                // 垂直分离
+                if (dy > 0) {
+                    // character1在下方，将character1向下移动，character2向上移动
+                    pos1.y += 5;
+                    pos2.y -= 5;
+                } else {
+                    // character1在上方，将character1向上移动，character2向下移动
+                    pos1.y -= 5;
+                    pos2.y += 5;
+                }
+            }
+            
+            // 确保角色不会移出边界
+            pos1.x = Math.max(0, Math.min(730, pos1.x));
+            pos2.x = Math.max(0, Math.min(730, pos2.x));
+            pos1.y = Math.max(120, Math.min(260, pos1.y));
+            pos2.y = Math.max(120, Math.min(260, pos2.y));
+        }
     }
 
     public Dir getDir() {
@@ -96,6 +171,15 @@ public class Character {
     }
     public Point getPosition() {
         return position;
+    }
+    public Hitbox getHitbox() {
+        return hitbox;
+    }
+    public AttackBox getLeftAttackBox() {
+        return leftAttackBox;
+    }
+    public AttackBox getRightAttackBox() {
+        return rightAttackBox;
     }
     public int getSPEED() {
         return SPEED;

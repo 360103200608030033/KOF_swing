@@ -80,7 +80,11 @@ public class MyFrame extends JFrame {
         this.socket = socket;
 
        fighter1 = new Character("fighter1",true,"images/cao",100,150);
-       fighter2 = new Character("fighter2", false,"images/Chris",650,150);
+        fighter2 = new Character("fighter2", false,"images/Chris",650,150);
+        
+        // 设置角色间的相互引用，用于防止重叠
+        fighter1.getDir().setOtherCharacter(fighter2);
+        fighter2.getDir().setOtherCharacter(fighter1);
 
         //确定玩家的编号，从而分配到相应的角色
        if(playerNumber == 1) {
@@ -232,6 +236,15 @@ public class MyFrame extends JFrame {
                     serverFighter.getDir().move(g,serverFighter);
 
                 }
+                
+                // 绘制碰撞箱和攻击箱边框（调试用）
+                myFighter.getHitbox().drawBounds(g);
+                myFighter.getLeftAttackBox().drawBounds(g);
+                myFighter.getRightAttackBox().drawBounds(g);
+                
+                serverFighter.getHitbox().drawBounds(g);
+                serverFighter.getLeftAttackBox().drawBounds(g);
+                serverFighter.getRightAttackBox().drawBounds(g);
             }
 
             //判断输赢

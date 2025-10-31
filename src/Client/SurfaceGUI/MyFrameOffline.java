@@ -55,6 +55,10 @@ public class MyFrameOffline extends JFrame {
             aiFighter = playerFighterObj;
         }
         
+        // 设置角色间的相互引用，用于防止重叠
+        playerFighter.getDir().setOtherCharacter(aiFighter);
+        aiFighter.getDir().setOtherCharacter(playerFighter);
+        
         // 设置AI移动速度为较慢的值（玩家速度的一半）
         aiFighter.setSPEED(5);
         
@@ -238,6 +242,15 @@ public class MyFrameOffline extends JFrame {
                     playerFighter.getDir().move(g, playerFighter);
                     aiFighter.getDir().move(g, aiFighter);
                 }
+                
+                // 绘制碰撞箱和攻击箱边框（调试用）
+                playerFighter.getHitbox().drawBounds(g);
+                playerFighter.getLeftAttackBox().drawBounds(g);
+                playerFighter.getRightAttackBox().drawBounds(g);
+                
+                aiFighter.getHitbox().drawBounds(g);
+                aiFighter.getLeftAttackBox().drawBounds(g);
+                aiFighter.getRightAttackBox().drawBounds(g);
             }
             
             //判断输赢
