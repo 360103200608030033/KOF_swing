@@ -114,6 +114,11 @@ public class Dir {
         }
 
         character.drawCurrentMovement(g);
+        
+        // 防止角色重叠
+        if (otherCharacter != null) {
+            Character.preventOverlap(character, otherCharacter);
+        }
     }//实现上下左右行走
 
     //修正服务器控制角色的位置，缓解两个客户端同一个角色出现的位置错位情况
