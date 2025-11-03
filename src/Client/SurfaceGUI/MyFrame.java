@@ -414,10 +414,14 @@ public class MyFrame extends JFrame {
                     }
 
                 }
-
+                break;
+            case KeyEvent.VK_L:
+                // 防御动作
+                fighter.getDir().DEFEND = true;
+                break;
         }
         if(keyCode == KeyEvent.VK_W ||
-                keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J || keyCode == KeyEvent.VK_K) {
+                keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J || keyCode == KeyEvent.VK_K || keyCode == KeyEvent.VK_L) {
             fighter.getDir().LS = false;
             fighter.getDir().RS = false;
             //gif方向
@@ -441,6 +445,9 @@ public class MyFrame extends JFrame {
                 break;
             case KeyEvent.VK_D:
                 fighter.getDir().LF = false;
+                break;
+            case KeyEvent.VK_L:
+                fighter.getDir().DEFEND = false;
                 break;
 
         }

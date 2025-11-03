@@ -328,7 +328,7 @@ public class MyFrameOffline extends JFrame {
                         public void run() {
                             fighter.getDir().A = true;
                             try {
-                                Thread.sleep(500);
+                                Thread.sleep(300);
                             } catch (InterruptedException ex) {
                                 ex.printStackTrace();
                             }
@@ -361,7 +361,7 @@ public class MyFrameOffline extends JFrame {
                         public void run() {
                             fighter.getDir().KICK = true;
                             try {
-                                Thread.sleep(1000);
+                                Thread.sleep(500);
                             } catch (InterruptedException ex) {
                                 ex.printStackTrace();
                             }
@@ -377,6 +377,9 @@ public class MyFrameOffline extends JFrame {
                         aiFighter.getDir().fighterFall();
                         System.out.println("玩家踢腿AI成功！AI剩余血量：" + aiFighter.getHP());
                     }
+                    break;
+                case KeyEvent.VK_L:
+                    fighter.getDir().DEFEND = true;
                     break;
             }
             
@@ -406,9 +409,16 @@ public class MyFrameOffline extends JFrame {
                 case KeyEvent.VK_D:
                     fighter.getDir().LF = false;
                     break;
-                case KeyEvent.VK_K:
-                    fighter.getDir().KICK = false;
+                case KeyEvent.VK_L:
+                    fighter.getDir().DEFEND = false;
                     break;
+            }
+            if(keyCode == KeyEvent.VK_W ||
+                    keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J || keyCode == KeyEvent.VK_K || keyCode == KeyEvent.VK_L) {
+                fighter.getDir().LS = false;
+                fighter.getDir().RS = false;
+                //gif方向
+                //locateDirection();
             }
         }
     }

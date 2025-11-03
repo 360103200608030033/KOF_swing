@@ -29,23 +29,42 @@ public class Character {
     
     private long lastAttackTime = 0;//上次攻击时间
     private long lastKickTime = 0;
-    private static final long ATTACK_COOLDOWN = 500;//攻击冷却时间（毫秒）
+    private static final long ATTACK_COOLDOWN = 600;//攻击冷却时间（毫秒）
     private static final long KICK_COOLDOWN = 1000;
-
-
-    public Character(String name,boolean leftOrRight,String rootDir,int x,int y) {
-        Toolkit tk =Toolkit.getDefaultToolkit();
-        this.name = name;
-
+    
+    private ArrayList<Dimension> movementSizes; // 新增：保存每个动作图片的实际尺寸
+    
+    public Character(String name, boolean leftOrRight,String rootDir,int x, int y ) {
+        Toolkit tk = Toolkit.getDefaultToolkit();
         movements = new ArrayList<Image>();
+        movementSizes = new ArrayList<Dimension>(); // 初始化尺寸列表
         position = new Point(x,y);
 
-
-        for(int i = 1; i <= 10; i++) {
-            movements.add(tk.getImage(Character.class.getClassLoader()
-                    .getResource(rootDir + "/" + i + ".gif")));
+        // 使用ImageIcon预加载图片并获取准确尺寸
+        for(int i = 1; i <= 12; i++) {
+            // 添加资源路径检查和调试信息
+            String resourcePath = rootDir + "/" + i + ".gif";
+            java.net.URL resourceUrl = Character.class.getClassLoader().getResource(resourcePath);
+            
+            Image image = null;
+            Dimension size = null;
+            if (resourceUrl != null) {
+                // 使用ImageIcon预加载图片
+                javax.swing.ImageIcon icon = new javax.swing.ImageIcon(resourceUrl);
+                image = icon.getImage();
+                size = new Dimension(icon.getIconWidth(), icon.getIconHeight());
+                System.out.println("成功加载图片: " + resourcePath + ", 实际尺寸: " + 
+                    size.width + "x" + size.height);
+            } else {
+                
+                    // 如果资源不存在，添加null到列表并输出警告
+                    image = null;
+                    size = null;
+                    System.err.println("警告: 无法找到图片资源: " );
+            }
+            movements.add(image);
+            movementSizes.add(size);
         }
-
         dir = new Dir(leftOrRight);//监控动作
         dir.setCurrentDir(leftOrRight);
         dir.createMap(movements);//创建对应动作maps
@@ -79,14 +98,48 @@ public class Character {
             rightAttackBox.updatePosition();
             leftKickBox.updatePosition();
             rightKickBox.updatePosition();
+
             
-            g.drawImage(currentMovement,
-                    (int)position.getX(),
-                    (int)position.getY(),
-                    currentMovement.getWidth(null) * 2,
-                    currentMovement.getHeight(null) * 2,null);
+            // 获取预加载时保存的准确尺寸
+            Dimension actualSize = getMovementSize(currentMovement);
+            String currentAction = dir.getCurrentAction();
+            if (actualSize != null) {
+                // 使用准确尺寸进行缩放
+                int drawWidth = actualSize.width * 2;
+                int drawHeight = actualSize.height * 2;
+                int originalWidth = currentMovement.getWidth(null);
+                int originalHeight = currentMovement.getHeight(null);
+                // 绘制图片，使用准确尺寸避免缩放问题
+                g.drawImage(currentMovement,
+                        (int)position.getX(),
+                        (int)position.getY(),
+                        drawWidth,
+                        drawHeight,
+                        //originalWidth * 2,
+                        //originalHeight * 2,
+                        null);
+                //if(currentAction.equals("LDEF"))System.out.println(drawWidth+","+drawHeight);
+            } else {
+
+                System.out.println("图片未加载完成，跳过绘制");
+
+            }
         }
 
+    }
+    
+    /**
+     * 根据图片对象获取预加载时保存的准确尺寸
+     * @param movement 动作图片
+     * @return 图片尺寸，如果未找到返回null
+     */
+    private Dimension getMovementSize(Image movement) {
+        for (int i = 0; i < movements.size(); i++) {
+            if (movements.get(i) == movement) {
+                return movementSizes.get(i);
+            }
+        }
+        return null;
     }
 
     /**
@@ -99,6 +152,12 @@ public class Character {
         // 如果被攻击者处于击倒状态，则无法再次被攻击
         if(fighter2.getDir().FALL) {
             System.out.println("攻击检测: 被攻击者处于FALL状态，无法被攻击");
+            return false;
+        }
+        
+        // 如果被攻击者处于防御状态，则不造成伤害
+        if(fighter2.getDir().DEFEND) {
+            System.out.println("攻击检测: 被攻击者处于DEFEND状态，攻击被防御");
             return false;
         }
         
@@ -130,10 +189,18 @@ public class Character {
     }
 
     public static boolean isKicked(Character fighter1,Character fighter2){
+        // 如果被攻击者处于击倒状态，则无法再次被攻击
         if(fighter2.getDir().FALL) {
             System.out.println("踢腿检测: 被攻击者处于FALL状态，无法被踢中");
             return false;
         }
+        
+        // 如果被攻击者处于防御状态，则不造成伤害
+        if(fighter2.getDir().DEFEND) {
+            System.out.println("踢腿检测: 被攻击者处于DEFEND状态，踢腿被防御");
+            return false;
+        }
+        
         AttackBox kickBox = null;
         if (fighter1.getDir().getCurrentDir() == Character.RIGHT) {
             // 使用左腿攻击箱
