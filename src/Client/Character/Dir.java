@@ -24,7 +24,6 @@ public class Dir {
     public boolean A;//攻击
     public boolean KICK;
     public boolean DEFEND;//防御
-    public boolean KICK;
     public boolean FALL;//被击倒
     public boolean JUMPING;
     public boolean JUMP_UP;
@@ -46,6 +45,7 @@ public class Dir {
         //攻击和击倒
         A = false;
         FALL = false;
+        KICK = false;
         JUMPING = false;
         JUMP_UP = false;
         JUMP_DOWN = false;
@@ -56,7 +56,8 @@ public class Dir {
     public void createMap(ArrayList<Image> movements) {
         //将movement做成maps
         //Left Forward, Left Stand, ...往右走，往右停，往左走，往左停,左攻击，右攻击，左倒，右倒
-        String[] keys = {"LF","LS","RF","RS","LA","RA","LH","RH"};
+        //添加踢腿相关键名
+        String[] keys = {"LF","LS","RF","RS","LA","RA","LH","RH","LK","RK","LDEF","RDEF","LJ","RJ"};
         for(int i = 0; i < movements.size(); i++) {
             moveMap.put(keys[i],movements.get(i));
         }
@@ -66,7 +67,7 @@ public class Dir {
 
     public void locateDirection() {
         if(!LF && !RF && !RU && !LU && !RD && //无动作触发，站立
-                !LD && !A && !FALL) {//如果没有其他动作，就站立
+                !LD && !A && !FALL && !KICK && !DEFEND && !JUMPING && !JUMP_UP && !JUMP_DOWN) {//如果没有其他动作，就站立
             if (getCurrentDir() == Character.LEFT) {
                 LS = true;
                 setCurrentMovement(getMoveMap().get("LS"));
@@ -118,20 +119,6 @@ public class Dir {
             // 更新Y位置
             character.getPosition().y += character.getJumpVelocity();
             
-            // 设置跳跃场景边界限制
-            // 下边界限制（防止跳出屏幕底部）
-            // 使用地面Y坐标作为下边界，确保角色不会低于地面
-            int lowerBound = character.getGroundY();
-            if (character.getPosition().y > lowerBound) {
-                character.getPosition().y = lowerBound;
-                // 到达地面时结束跳跃
-                character.setJumping(false);
-                character.setOnGround(true);
-                character.setJumpVelocity(0);
-                JUMP_UP = false;
-                JUMP_DOWN = false;
-            }
-            
             // 水平边界限制（防止跳出屏幕左右两侧）
             int leftBound = 0;      // 左边界
             int rightBound = 730;   // 右边界（与原有limitLocation方法保持一致）
@@ -141,31 +128,31 @@ public class Dir {
                 character.getPosition().x = rightBound;
             }
 
-            // 检查是否到达地面或跳跃最高点后的回落阶段
+            // 根据跳跃模式决定落地逻辑
+            boolean shouldEndJump = false;
+            
+            // 模式1：原地跳跃模式（落回起跳位置）
             if (character.isJumpingAtSameSpot() && character.getJumpVelocity() > 0) {
-                // 计算当前跳跃高度
-                double currentHeight = character.getJumpStartPosition().y - character.getPosition().y;
-                
                 // 当跳跃高度开始回落，且回到初始位置时完成跳跃
                 if (character.getPosition().y >= character.getJumpStartPosition().y) {
                     // 落回起跳位置
                     character.getPosition().setLocation(character.getJumpStartPosition());
-                    character.setJumping(false);
-                    character.setOnGround(true);
-                    character.setJumpVelocity(0);
-                    JUMP_UP = false;
-                    JUMP_DOWN = false;
+                    shouldEndJump = true;
                 }
-            } else {
-                // 普通跳跃模式，落回地面
-                if (character.getPosition().y >= character.getGroundY()) {
-                    character.getPosition().y = character.getGroundY();
-                    character.setJumping(false);
-                    character.setOnGround(true);
-                    character.setJumpVelocity(0);
-                    JUMP_UP = false;
-                    JUMP_DOWN = false;
-                }
+            } 
+            if (character.getJumpVelocity() > 0 && character.getPosition().y >= character.getJumpStartPosition().y) {
+                // 保持水平位置不变，只将Y位置设置为起跳时的Y坐标
+                character.getPosition().y = character.getJumpStartPosition().y;
+                shouldEndJump = true;
+            }
+            
+            // 统一处理跳跃结束逻辑
+            if (shouldEndJump) {
+                character.setJumping(false);
+                character.setOnGround(true);
+                character.setJumpVelocity(0);
+                JUMP_UP = false;
+                JUMP_DOWN = false;
             }
             
             // 更新跳跃状态
@@ -272,6 +259,8 @@ public class Dir {
             return getCurrentDir() == Character.LEFT ? "LK" : "RK";
         } else if (DEFEND) {
             return getCurrentDir() == Character.LEFT ? "LDEF" : "RDEF";
+        } else if(JUMPING){
+            return getCurrentDir() == Character.LEFT ? "LJ" : "RJ";
         } else if (LF || LU || LD) {
             return "LF";
         } else if (RF || RU || RD) {
