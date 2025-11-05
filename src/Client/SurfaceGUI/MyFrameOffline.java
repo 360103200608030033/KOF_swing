@@ -361,7 +361,7 @@ public class MyFrameOffline extends JFrame {
                         public void run() {
                             fighter.getDir().KICK = true;
                             try {
-                                Thread.sleep(500);
+                                Thread.sleep(300);
                             } catch (InterruptedException ex) {
                                 ex.printStackTrace();
                             }
@@ -378,13 +378,18 @@ public class MyFrameOffline extends JFrame {
                         System.out.println("玩家踢腿AI成功！AI剩余血量：" + aiFighter.getHP());
                     }
                     break;
+                case KeyEvent.VK_SPACE:
+                    if (fighter.isOnGround()) {
+                        fighter.startJump();
+                    }
+                    break;
                 case KeyEvent.VK_L:
                     fighter.getDir().DEFEND = true;
                     break;
             }
             
             if(keyCode == KeyEvent.VK_W ||
-                    keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J ||keyCode == KeyEvent.VK_K) {
+                    keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J) {
                 fighter.getDir().LS = false;
                 fighter.getDir().RS = false;
             }
@@ -414,7 +419,7 @@ public class MyFrameOffline extends JFrame {
                     break;
             }
             if(keyCode == KeyEvent.VK_W ||
-                    keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J || keyCode == KeyEvent.VK_K || keyCode == KeyEvent.VK_L) {
+                    keyCode == KeyEvent.VK_S ||keyCode == KeyEvent.VK_A ||keyCode == KeyEvent.VK_D ||keyCode == KeyEvent.VK_J || keyCode == KeyEvent.VK_K || keyCode == KeyEvent.VK_L || keyCode == KeyEvent.VK_SPACE) {
                 fighter.getDir().LS = false;
                 fighter.getDir().RS = false;
                 //gif方向
@@ -463,15 +468,18 @@ public class MyFrameOffline extends JFrame {
                 if (Math.random() < 0.15) {
                     // 15%概率攻击
                     performAttack();
-                } else {
-                    // 85%概率移动
+                } else if(Math.random() < 0.1 && aiFighter.isOnGround()){
+                    aiFighter.startJump();
+                }else {
                     moveRandomly();
                 }
             } else {
                 // 近距离，中等概率攻击
                 if (Math.random() < 0.4) {
                     performAttack();
-                } else {
+                } else if(Math.random() < 0.1 && aiFighter.isOnGround()){
+                    aiFighter.startJump();
+                }else {
                     moveRandomly();
                 }
             }

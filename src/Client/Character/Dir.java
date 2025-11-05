@@ -25,7 +25,9 @@ public class Dir {
     public boolean KICK;
     public boolean DEFEND;//防御
     public boolean FALL;//被击倒
-
+    public boolean JUMPING;
+    public boolean JUMP_UP;
+    public boolean JUMP_DOWN;
 
 
     public Dir(boolean isLeft) {//初始状态是面向左还是面向右
@@ -42,9 +44,11 @@ public class Dir {
 
         //攻击和击倒
         A = false;
-        KICK = false;
-        DEFEND = false;
         FALL = false;
+        KICK = false;
+        JUMPING = false;
+        JUMP_UP = false;
+        JUMP_DOWN = false;
     }
 
 
@@ -52,7 +56,8 @@ public class Dir {
     public void createMap(ArrayList<Image> movements) {
         //将movement做成maps
         //Left Forward, Left Stand, ...往右走，往右停，往左走，往左停,左攻击，右攻击，左倒，右倒
-        String[] keys = {"LF","LS","RF","RS","LA","RA","LH","RH","LK","RK","LDEF","RDEF"};
+        //添加踢腿相关键名
+        String[] keys = {"LF","LS","RF","RS","LA","RA","LH","RH","LK","RK","LDEF","RDEF","LJ","RJ"};
         for(int i = 0; i < movements.size(); i++) {
             moveMap.put(keys[i],movements.get(i));
         }
@@ -62,7 +67,7 @@ public class Dir {
 
     public void locateDirection() {
         if(!LF && !RF && !RU && !LU && !RD && //无动作触发，站立
-                !LD && !A && !KICK && !DEFEND && !FALL) {//如果没有其他动作，就站立
+                !LD && !A && !FALL && !KICK && !DEFEND && !JUMPING && !JUMP_UP && !JUMP_DOWN) {//如果没有其他动作，就站立
             if (getCurrentDir() == Character.LEFT) {
                 LS = true;
                 setCurrentMovement(getMoveMap().get("LS"));
@@ -84,6 +89,9 @@ public class Dir {
         } else if(DEFEND){
             if(getCurrentDir() == Character.LEFT) setCurrentMovement(getMoveMap().get("LDEF"));//如果左防为真，则触发左防动作
             else  setCurrentMovement(getMoveMap().get("RDEF"));
+        } else if(JUMPING){
+            if (getCurrentDir() == Character.LEFT) setCurrentMovement(getMoveMap().get("LJ"));
+            else  setCurrentMovement(getMoveMap().get("RJ"));
         } else {
                 if (LF || LU || LD) {
                     setCurrentMovement(getMoveMap().get("LF"));//否则前进
@@ -103,18 +111,81 @@ public class Dir {
     }//限制角色走出范围
 
     public void move(Graphics g, Character character) {//更新图片
-        if(!LS && !RS && !FALL && !DEFEND) {//移动
+        // 处理跳跃逻辑
+        if (character.isJumping()) {
+            // 更新跳跃速度（应用重力）
+            character.updateJumpVelocity();
+
+            // 更新Y位置
+            character.getPosition().y += character.getJumpVelocity();
+            
+            // 水平边界限制（防止跳出屏幕左右两侧）
+            int leftBound = 0;      // 左边界
+            int rightBound = 730;   // 右边界（与原有limitLocation方法保持一致）
+            if (character.getPosition().x < leftBound) {
+                character.getPosition().x = leftBound;
+            } else if (character.getPosition().x > rightBound) {
+                character.getPosition().x = rightBound;
+            }
+
+            // 根据跳跃模式决定落地逻辑
+            boolean shouldEndJump = false;
+            
+            // 模式1：原地跳跃模式（落回起跳位置）
+            if (character.isJumpingAtSameSpot() && character.getJumpVelocity() > 0) {
+                // 当跳跃高度开始回落，且回到初始位置时完成跳跃
+                if (character.getPosition().y >= character.getJumpStartPosition().y) {
+                    // 落回起跳位置
+                    character.getPosition().setLocation(character.getJumpStartPosition());
+                    shouldEndJump = true;
+                }
+            } 
+            if (character.getJumpVelocity() > 0 && character.getPosition().y >= character.getJumpStartPosition().y) {
+                // 保持水平位置不变，只将Y位置设置为起跳时的Y坐标
+                character.getPosition().y = character.getJumpStartPosition().y;
+                shouldEndJump = true;
+            }
+            
+            // 统一处理跳跃结束逻辑
+            if (shouldEndJump) {
+                character.setJumping(false);
+                character.setOnGround(true);
+                character.setJumpVelocity(0);
+                JUMP_UP = false;
+                JUMP_DOWN = false;
+            }
+            
+            // 更新跳跃状态
+            if (character.isJumping()) {
+                if (character.getJumpVelocity() < 0) {
+                    // 上升阶段
+                    JUMP_UP = true;
+                    JUMP_DOWN = false;
+                } else {
+                    // 下降阶段
+                    JUMP_UP = false;
+                    JUMP_DOWN = true;
+                }
+            }
+        }
+        
+        // 处理水平移动（无论是否跳跃都允许）
+        if(!LS && !RS && !FALL) {
             if (LF) {//往右走
-                character.getPosition().x = limitLocation(character.getPosition().x,character.getSPEED(),0,730,true);
+                character.getPosition().x = limitLocation(character.getPosition().x, character.getSPEED(), 0, 730, true);
             }
             if (RF) {//往左走
-                character.getPosition().x = limitLocation(character.getPosition().x,character.getSPEED(),0,730,false);
+                character.getPosition().x = limitLocation(character.getPosition().x, character.getSPEED(), 0, 730, false);
             }
-            if (RU || LU) {//往上走
-                character.getPosition().y = limitLocation(character.getPosition().y,character.getSPEED(),120,260,false);
-            }
-            if (RD || LD) {//往下走
-                character.getPosition().y = limitLocation(character.getPosition().y,character.getSPEED(),120,260,true);
+            
+            // 只有不在跳跃时才允许垂直移动（地面移动）
+            if (!character.isJumping()) {
+                if (RU || LU) {//往上走
+                    character.getPosition().y = limitLocation(character.getPosition().y, character.getSPEED(), 120, 260, false);
+                }
+                if (RD || LD) {//往下走
+                    character.getPosition().y = limitLocation(character.getPosition().y, character.getSPEED(), 120, 260, true);
+                }
             }
         }
 
@@ -188,6 +259,8 @@ public class Dir {
             return getCurrentDir() == Character.LEFT ? "LK" : "RK";
         } else if (DEFEND) {
             return getCurrentDir() == Character.LEFT ? "LDEF" : "RDEF";
+        } else if(JUMPING){
+            return getCurrentDir() == Character.LEFT ? "LJ" : "RJ";
         } else if (LF || LU || LD) {
             return "LF";
         } else if (RF || RU || RD) {

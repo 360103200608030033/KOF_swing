@@ -30,7 +30,15 @@ public class Character {
     private long lastAttackTime = 0;//上次攻击时间
     private long lastKickTime = 0;
     private static final long ATTACK_COOLDOWN = 600;//攻击冷却时间（毫秒）
-    private static final long KICK_COOLDOWN = 1000;
+    private static final long KICK_COOLDOWN = 600;
+    private static final long JUMP_COOLDOWN = 900; // 跳跃冷却时间（毫秒）
+    private boolean isOnGround = true; // 角色是否在地面
+    private double jumpVelocity = 0;  // 跳跃速度
+    private final double GRAVITY = 0.5; // 重力加速度
+    private final double JUMP_FORCE = -12.0; // 跳跃力度
+    private Point jumpStartPosition = new Point(0, 0); // 起跳位置
+    private boolean isJumpingAtSameSpot = false; // 是否在同一位置跳跃
+    private long lastJumpTime = 0; // 上次跳跃时间
     
     private ArrayList<Dimension> movementSizes; // 新增：保存每个动作图片的实际尺寸
     
@@ -40,12 +48,12 @@ public class Character {
         movementSizes = new ArrayList<Dimension>(); // 初始化尺寸列表
         position = new Point(x,y);
 
-        // 使用ImageIcon预加载图片并获取准确尺寸
-        for(int i = 1; i <= 12; i++) {
+
+        for(int i = 1; i <= 14; i++) {
             // 添加资源路径检查和调试信息
             String resourcePath = rootDir + "/" + i + ".gif";
             java.net.URL resourceUrl = Character.class.getClassLoader().getResource(resourcePath);
-            
+
             Image image = null;
             Dimension size = null;
             if (resourceUrl != null) {
@@ -53,14 +61,14 @@ public class Character {
                 javax.swing.ImageIcon icon = new javax.swing.ImageIcon(resourceUrl);
                 image = icon.getImage();
                 size = new Dimension(icon.getIconWidth(), icon.getIconHeight());
-                System.out.println("成功加载图片: " + resourcePath + ", 实际尺寸: " + 
-                    size.width + "x" + size.height);
+                System.out.println("成功加载图片: " + resourcePath + ", 实际尺寸: " +
+                        size.width + "x" + size.height);
             } else {
-                
-                    // 如果资源不存在，添加null到列表并输出警告
-                    image = null;
-                    size = null;
-                    System.err.println("警告: 无法找到图片资源: " );
+
+                // 如果资源不存在，添加null到列表并输出警告
+                image = null;
+                size = null;
+                System.err.println("警告: 无法找到图片资源: " );
             }
             movements.add(image);
             movementSizes.add(size);
@@ -131,15 +139,28 @@ public class Character {
     /**
      * 根据图片对象获取预加载时保存的准确尺寸
      * @param movement 动作图片
-     * @return 图片尺寸，如果未找到返回null
+     * @return 图片尺寸，如果未找到或尺寸数组为空，返回默认尺寸
      */
     private Dimension getMovementSize(Image movement) {
+        // 检查movementSizes数组是否为空
+        if (movementSizes == null || movementSizes.isEmpty()) {
+            // 返回默认尺寸以避免异常
+            return new Dimension(30, 60);
+        }
+        
         for (int i = 0; i < movements.size(); i++) {
             if (movements.get(i) == movement) {
-                return movementSizes.get(i);
+                // 检查索引是否在有效范围内
+                if (i < movementSizes.size()) {
+                    return movementSizes.get(i);
+                } else {
+                    // 索引超出范围时返回默认尺寸
+                    return new Dimension(30, 60);
+                }
             }
         }
-        return null;
+        // 未找到对应图片时返回默认尺寸
+        return new Dimension(30, 60);
     }
 
     /**
@@ -187,41 +208,6 @@ public class Character {
         
         return false;
     }
-
-    public static boolean isKicked(Character fighter1,Character fighter2){
-        // 如果被攻击者处于击倒状态，则无法再次被攻击
-        if(fighter2.getDir().FALL) {
-            System.out.println("踢腿检测: 被攻击者处于FALL状态，无法被踢中");
-            return false;
-        }
-        
-        // 如果被攻击者处于防御状态，则不造成伤害
-        if(fighter2.getDir().DEFEND) {
-            System.out.println("踢腿检测: 被攻击者处于DEFEND状态，踢腿被防御");
-            return false;
-        }
-        
-        AttackBox kickBox = null;
-        if (fighter1.getDir().getCurrentDir() == Character.RIGHT) {
-            // 使用左腿攻击箱
-            kickBox = fighter1.leftKickBox;
-        } else {
-            // 使用右腿攻击箱
-            kickBox = fighter1.rightKickBox;
-        }
-        boolean isHit = kickBox.intersects(fighter2.getHitbox());
-        if (isHit) {
-            Point p1 = fighter1.getPosition();
-            Point p2 = fighter2.getPosition();
-            System.out.println("kick! 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ") - 踢腿成功！");
-            return true;
-        } else {
-            Point p1 = fighter1.getPosition();
-            Point p2 = fighter2.getPosition();
-            System.out.println("踢腿检测: 攻击者位置: (" + p1.x + ", " + p1.y + "), 被攻击者位置: (" + p2.x + ", " + p2.y + ") - 踢腿失败");
-        }
-        return false;
-    }
     
     /**
      * 防止两个角色重叠
@@ -244,23 +230,40 @@ public class Character {
                 // 水平分离
                 if (dx > 0) {
                     // character1在右侧，将character1向右移动，character2向左移动
-                    pos1.x += 5;
-                    pos2.x -= 5;
+                    // 如果角色处于跳跃状态，不改变垂直位置
+                    if (!character1.isJumping()) {
+                        pos1.x += 5;
+                    }
+                    if (!character2.isJumping()) {
+                        pos2.x -= 5;
+                    }
                 } else {
                     // character1在左侧，将character1向左移动，character2向右移动
-                    pos1.x -= 5;
-                    pos2.x += 5;
+                    if (!character1.isJumping()) {
+                        pos1.x -= 5;
+                    }
+                    if (!character2.isJumping()) {
+                        pos2.x += 5;
+                    }
                 }
             } else {
-                // 垂直分离
+                // 垂直分离 - 跳跃中的角色不受影响，以保证跳跃动作完整性
                 if (dy > 0) {
                     // character1在下方，将character1向下移动，character2向上移动
-                    pos1.y += 5;
-                    pos2.y -= 5;
+                    if (!character1.isJumping()) {
+                        pos1.y += 5;
+                    }
+                    if (!character2.isJumping()) {
+                        pos2.y -= 5;
+                    }
                 } else {
                     // character1在上方，将character1向上移动，character2向下移动
-                    pos1.y -= 5;
-                    pos2.y += 5;
+                    if (!character1.isJumping()) {
+                        pos1.y -= 5;
+                    }
+                    if (!character2.isJumping()) {
+                        pos2.y += 5;
+                    }
                 }
             }
             
@@ -334,16 +337,243 @@ public class Character {
         long elapsed = System.currentTimeMillis() - lastAttackTime;
         return Math.max(0, ATTACK_COOLDOWN - elapsed);
     }
-
-    public boolean canKick(){
+    
+    /**
+     * 检查是否可以踢腿（冷却时间是否结束）
+     * @return 是否可以踢腿
+     */
+    public boolean canKick() {
         return System.currentTimeMillis() - lastKickTime >= KICK_COOLDOWN;
     }
-    public void setKickTime(){
+    
+    /**
+     * 设置踢腿时间，开始冷却
+     */
+    public void setKickTime() {
         lastKickTime = System.currentTimeMillis();
     }
-    public long getKickRemainingCooldown(){
+    
+    /**
+     * 获取踢腿剩余冷却时间
+     * @return 剩余冷却时间（毫秒）
+     */
+    public long getKickRemainingCooldown() {
         long elapsed = System.currentTimeMillis() - lastKickTime;
         return Math.max(0, KICK_COOLDOWN - elapsed);
+    }
+    
+    /**
+     * 检查角色是否正在踢腿
+     * @return 是否正在踢腿
+     */
+    public boolean isKicked() {
+        return dir.KICK;
+    }
+    
+    /**
+     * 设置踢腿状态
+     * @param kicked 是否踢腿
+     */
+    public void setKicked(boolean kicked) {
+        dir.KICK = kicked;
+    }
+    
+    /**
+     * 开始踢腿动作
+     */
+    public void startKick() {
+        // 只有不在冷却状态才能踢腿
+        if (canKick()) {
+            setKicked(true);
+            setKickTime();
+            // 踢腿动画通常持续较短时间，这里可以添加定时器来重置踢腿状态
+            new Thread(() -> {
+                try {
+                    Thread.sleep(300); // 踢腿动作持续时间
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                setKicked(false);
+            }).start();
+        }
+    }
+    
+    /**
+     * 当fighter1成功踢中fighter2时，返回true，否则返回false
+     * @param fighter1 踢腿者
+     * @param fighter2 被踢者
+     * @return 是否踢中成功
+     */
+    public static boolean isKicked(Character fighter1, Character fighter2) {
+        // 如果被踢者处于击倒状态，则无法再次被踢
+        if (fighter2.getDir().FALL) {
+            System.out.println("踢腿检测: 被踢者处于FALL状态，无法被踢");
+            return false;
+        }
+        
+        // 如果被踢者处于防御状态，则不造成伤害
+        if (fighter2.getDir().DEFEND) {
+            System.out.println("踢腿检测: 被踢者处于DEFEND状态，踢腿被防御");
+            return false;
+        }
+        
+        // 根据踢腿者的方向选择对应的踢腿箱进行检测
+        AttackBox kickBox = null;
+        if (fighter1.getDir().getCurrentDir() == Character.RIGHT) {
+            // 使用向左踢腿箱
+            kickBox = fighter1.getLeftKickBox();
+        } else {
+            // 使用向右踢腿箱
+            kickBox = fighter1.getRightKickBox();
+        }
+        
+        // 检查踢腿箱是否与被踢者的碰撞箱相交
+        boolean isHit = kickBox.intersects(fighter2.getHitbox());
+        
+        if (isHit) {
+            Point p1 = fighter1.getPosition();
+            Point p2 = fighter2.getPosition();
+            System.out.println("kick! 踢腿者位置: (" + p1.x + ", " + p1.y + "), 被踢者位置: (" + p2.x + ", " + p2.y + ") - 踢腿成功！");
+            return true;
+        } else {
+            Point p1 = fighter1.getPosition();
+            Point p2 = fighter2.getPosition();
+            System.out.println("踢腿检测: 踢腿者位置: (" + p1.x + ", " + p1.y + "), 被踢者位置: (" + p2.x + ", " + p2.y + ") - 踢腿失败");
+        }
+        
+        return false;
+    }
+    
+    // 跳跃相关方法
+    
+    /**
+     * 检查角色是否正在跳跃
+     * @return 是否正在跳跃
+     */
+    public boolean isJumping() {
+        return dir.JUMPING;
+    }
+    
+    /**
+     * 设置角色跳跃状态
+     * @param jumping 是否跳跃
+     */
+    public void setJumping(boolean jumping) {
+        dir.JUMPING = jumping;
+    }
+    
+    /**
+     * 检查角色是否在地面
+     * @return 是否在地面
+     */
+    public boolean isOnGround() {
+        return isOnGround;
+    }
+    
+    /**
+     * 设置角色地面状态
+     * @param onGround 是否在地面
+     */
+    public void setOnGround(boolean onGround) {
+        this.isOnGround = onGround;
+    }
+    
+    /**
+     * 获取跳跃速度
+     * @return 跳跃速度
+     */
+    public double getJumpVelocity() {
+        return jumpVelocity;
+    }
+    
+    /**
+     * 设置跳跃速度
+     * @param jumpVelocity 新的跳跃速度
+     */
+    public void setJumpVelocity(double jumpVelocity) {
+        this.jumpVelocity = jumpVelocity;
+    }
+    
+    /**
+     * 更新跳跃速度（应用重力）
+     */
+    public void updateJumpVelocity() {
+        // 应用重力增加跳跃速度（正数表示向下）
+        jumpVelocity += GRAVITY;
+    }
+    
+    /**
+     * 获取地面Y坐标
+     * @return 地面Y坐标
+     */
+    public int getGroundY() {
+        // 固定地面Y坐标为260
+        return 260;
+    }
+    
+    /**
+     * 检查是否可以跳跃（考虑冷却时间）
+     * @return 是否可以跳跃
+     */
+    public boolean canJump() {
+        return System.currentTimeMillis() - lastJumpTime >= JUMP_COOLDOWN;
+    }
+    
+    /**
+     * 设置跳跃时间（用于冷却计算）
+     */
+    public void setJumpTime() {
+        lastJumpTime = System.currentTimeMillis();
+    }
+    
+    /**
+     * 获取跳跃剩余冷却时间
+     * @return 剩余冷却时间（毫秒）
+     */
+    public long getJumpRemainingCooldown() {
+        long elapsed = System.currentTimeMillis() - lastJumpTime;
+        return Math.max(0, JUMP_COOLDOWN - elapsed);
+    }
+    
+    /**
+     * 开始跳跃
+     */
+    public void startJump() {
+        // 只有在地面上且跳跃冷却结束才能开始跳跃
+        if (isOnGround() && canJump()) {
+            setOnGround(false);
+            setJumping(true);
+            // 保存起跳位置
+            jumpStartPosition.setLocation(position);
+            // 设置初始跳跃速度
+            setJumpVelocity(JUMP_FORCE);
+            // 记录跳跃时间
+            setJumpTime();
+        }
+    }
+    
+    /**
+     * 获取起跳位置
+     * @return 起跳位置
+     */
+    public Point getJumpStartPosition() {
+        return jumpStartPosition;
+    }
+    
+    /**
+     * 是否在同一位置跳跃
+     * @return 是否在同一位置跳跃
+     */
+    public boolean isJumpingAtSameSpot() {
+        return isJumpingAtSameSpot;
+    }
+    
+    /**
+     * 设置是否在同一位置跳跃
+     * @param jumpingAtSameSpot 是否在同一位置跳跃
+     */
+    public void setJumpingAtSameSpot(boolean jumpingAtSameSpot) {
+        this.isJumpingAtSameSpot = jumpingAtSameSpot;
     }
 }
 
